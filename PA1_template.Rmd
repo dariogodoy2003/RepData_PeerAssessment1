@@ -1,25 +1,129 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
 output: 
-  html_document:
-    keep_md: true
+  html_document: 
+    toc: yes
+    keep_md: yes
 ---
+Project Assignment 1 - Reproducible Research
+==============================================
+## Load data set
 
+```{r load data, echo = TRUE}
+url<- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+download.file(url,destfile = "data.zip",mod="wb")
+unzip("data.zip",exdir = ".")
+df<-read.csv("activity.csv",header=T)
+```
 
-## Loading and preprocessing the data
-
-
-
+## Data structure
+```{r, echo= TRUE}
+nrow(df)
+summary(df)
+str(df)
+```
+## Load libraries
+```{r, echo=TRUE}
+library(ggplot2)
+library(tidyverse)
+library(xtable)
+```
+## Modifying the dataset
+```{r,echo=TRUE}
+df[,2]<- as.Date(df[,2])
+str(df)
+df<-as_tibble(df)
+```
 ## What is mean total number of steps taken per day?
-
-
-
+```{r, echo=TRUE}
+steps_by_day<-df %>% 
+  group_by(date) %>%  
+  summarize(total_steps_by_day=sum(steps))
+steps_by_day
+```
+```{r,fig.height= 4}
+par(mar=c(5,4,1,1))
+ggplot(steps_by_day) +
+  geom_histogram(mapping=aes(total_steps_by_day),
+                 na.rm=T,color="orange",
+                 binwidth = 2000) + 
+  ggtitle("Histogram of the total number of steps taken each day") +
+  labs(x="Total steps by day", y="number of days")
+```
+```{r, echo=TRUE, results='asis'}
+xt <- xtable(steps_by_day %>% 
+               summarize(mean = mean(total_steps_by_day,na.rm = T),
+                         median = median(total_steps_by_day,
+                                         na.rm = T)))
+print(xt,type="html")
+```
 ## What is the average daily activity pattern?
+```{r, fig.height= 4, echo=TRUE}
+df2<- df %>% 
+  group_by(interval) %>% 
+  summarize(mean_steps=mean(steps,na.rm=T))
 
-
-
+ggplot(df2,aes(interval,mean_steps)) + 
+  geom_point() + 
+  ggtitle("Average number of steps by time of the day") +
+  labs(x="Time of the day (hhmm)", 
+       y = "Average number of steps taken") + 
+  theme(plot.title = element_text(face="bold"))
+```
+```{r, echo=TRUE, results='asis'}
+xt <- xtable(df2 %>% 
+               summarize(df2[which.max(mean_steps),1], 
+                         Max = max(mean_steps)))
+print(xt,type="html")
+```
 ## Imputing missing values
-
-
-
+```{r, echo=TRUE}
+paste("Total of NAs in dataset : ",sum(is.na(df)))
+```
+```{r, echo=TRUE}
+a<-df %>% 
+  filter (is.na(df)) %>% 
+  right_join(df2,by = "interval") %>% 
+  mutate(steps = mean_steps) %>% 
+  select(steps,date,interval)
+b<-df %>% 
+  filter (!is.na(df)) 
+df4<-bind_rows(a,b)
+summary(df)
+summary(df4)
+```
+```{r, echo=TRUE}
+steps_by_day2<-df4 %>% 
+  group_by(date) %>%  
+  summarize(total_steps_by_day2=sum(steps))
+steps_by_day2
+```
+```{r, fig.height= 4}
+par(mar=c(5,4,1,1))
+ggplot(steps_by_day2) +
+  geom_histogram(mapping=aes(total_steps_by_day2),
+                 na.rm=TRUE,color="blue",
+                 binwidth = 2000) + 
+  ggtitle("Histogram of the total number of steps taken each day \n(impute NAs)") +
+  labs(x="Total steps by day without NAs", y="number of days")
+```
+```{r, echo=TRUE, results='asis'}
+xt <- xtable(steps_by_day2 %>% 
+               summarize(mean = mean(total_steps_by_day2,
+                                     na.rm = T),
+                         median = median(total_steps_by_day2,
+                                         na.rm = T)))
+print(xt,type="html")
+```
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r,echo=TRUE}
+df5<-df4 %>% mutate (day = weekdays(date)) %>% mutate(day = ifelse(day =="lunes"|day =="martes"|day=="miércoles"|day =="jueves"| day =="viernes","weekday","weekend")) %>% mutate(day = factor(day))
+```
+```{r, fig.height= 6, echo=TRUE}
+ggplot(df5,aes(interval,steps)) +
+  geom_point() +
+  ggtitle("Average number of steps by time of the day\n(imputed NA's)") +
+  labs(x="Time of the day (hhmm)", 
+       y = "Average number of steps taken") + 
+  theme(plot.title = element_text(face="bold")) +
+  facet_grid(rows = "day")
+```
